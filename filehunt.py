@@ -6,21 +6,32 @@
 # filehunt: general file searching library for use by PANhunt and PassHunt
 # By BB
 
-import os, sys, zipfile, re, datetime, cStringIO, argparse, time, hashlib, unicodedata, codecs
+import os
+import sys
+import pickle
+import zipfile
+# import re
+import datetime
+from io import StringIO
+# import argparse
+# import time
+# import hashlib
+import unicodedata
+import codecs
 import colorama
 import progressbar
-import pst # MS-PST files
-import msmsg # MS-MSG files
+import pst  # MS-PST files
+import msmsg  # MS-MSG files
 
-TEXT_FILE_SIZE_LIMIT = 1073741824 # 1Gb
+TEXT_FILE_SIZE_LIMIT = 1073741824  # 1Gb
 
 ###################################################################################################################################
-#   ____ _                         
-#  / ___| | __ _ ___ ___  ___  ___ 
+#   ____ _
+#  / ___| | __ _ ___ ___  ___  ___
 # | |   | |/ _` / __/ __|/ _ \/ __|
 # | |___| | (_| \__ \__ \  __/\__ \
 #  \____|_|\__,_|___/___/\___||___/
-#                                  
+#
 ###################################################################################################################################
 
 
@@ -28,7 +39,7 @@ class AFile:
     """ AFile: class for a file that can search itself"""
 
     def __init__(self, filename, file_dir):
-        
+
         self.filename = filename
         self.dir = file_dir
         self.path = os.path.join(self.dir, self.filename)
@@ -37,9 +48,12 @@ class AFile:
         self.type = None
         self.matches = []
 
+    def cmp(a, b):
+        return (a > b) - (a < b)
+
     def __cmp__(self, other):
-    
-        return cmp(self.path.lower(), other.path.lower())
+
+        return self.cmp(self.path.lower(), other.path.lower())
 
 
     def set_file_stats(self):
@@ -52,29 +66,27 @@ class AFile:
             self.created = self.dtm_from_ts(stat.st_ctime)
         except: # WindowsError:
             self.size = -1
-            self.set_error(sys.exc_info()[1])            
-            
+            self.set_error(sys.exc_info()[1])
+
 
     def dtm_from_ts(self, ts):
-        
+
         try:
             return datetime.datetime.fromtimestamp(ts)
-        except ValueError: 
+        except ValueError:
             if ts == -753549904:
                 return datetime.datetime(1946, 2, 14, 8, 34, 56) # Mac OSX "while copying" thing
             else:
-                self.set_error(sys.exc_info()[1])                         
+                self.set_error(sys.exc_info()[1])
 
 
     def size_friendly(self):
-
         return get_friendly_size(self.size)
 
-
     def set_error(self, error_msg):
-
         self.errors.append(error_msg)
-        print colorama.Fore.RED + unicode2ascii(u'ERROR %s on %s' % (error_msg, self.path)) + colorama.Fore.WHITE
+        # print(colorama.Fore.RED + unicode2ascii('ERROR %s on %s' % (error_msg, self.path)) + colorama.Fore.WHITE)
+        print(colorama.Fore.RED + 'ERROR %s on %s' % (error_msg, self.path) + colorama.Fore.WHITE)
 
 
     def check_regexs(self, regexs, search_extensions):
@@ -84,7 +96,7 @@ class AFile:
             try:
                 if zipfile.is_zipfile(self.path):
                     zf = zipfile.ZipFile(self.path)
-                    self.check_zip_regexs(zf, regexs, search_extensions, '')                                             
+                    self.check_zip_regexs(zf, regexs, search_extensions, '')
                 else:
                     self.set_error('Invalid ZIP file')
             except IOError:
@@ -160,8 +172,8 @@ class AFile:
                             pbar.update(items_completed * 100.0 / total_items)
                         else:
                             gauge_update_function(value = items_completed * 100.0 / total_items)
-    
-            apst.close()    
+
+            apst.close()
 
         except IOError:
             self.set_error(sys.exc_info()[1])
@@ -185,7 +197,7 @@ class AFile:
         if attachment_ext in search_extensions['ZIP']:
             if attachment.data:
                 try:
-                    memory_zip = cStringIO.StringIO()
+                    memory_zip = StringIO()
                     memory_zip.write(attachment.data)
                     zf = zipfile.ZipFile(memory_zip)
                     self.check_zip_regexs(zf, regexs, search_extensions, os.path.join(sub_path, attachment.Filename))
@@ -212,9 +224,9 @@ class AFile:
         for file_in_zip in files_in_zip:
             if get_ext(file_in_zip) in search_extensions['ZIP']: # nested zip file
                 try:
-                    memory_zip = cStringIO.StringIO()
+                    memory_zip = StringIO()
                     memory_zip.write(zf.open(file_in_zip).read())
-                    nested_zf = zipfile.ZipFile(memory_zip)                    
+                    nested_zf = zipfile.ZipFile(memory_zip)
                     self.check_zip_regexs(nested_zf, regexs, search_extensions, os.path.join(sub_path, decode_zip_filename(file_in_zip)))
                     memory_zip.close()
                 except: #RuntimeError: # e.g. zip needs password
@@ -224,11 +236,11 @@ class AFile:
                     file_text = zf.open(file_in_zip).read()
                     self.check_text_regexs(file_text, regexs, os.path.join(sub_path, decode_zip_filename(file_in_zip)))
                 except: # RuntimeError: # e.g. zip needs password
-                    self.set_error(sys.exc_info()[1])     
+                    self.set_error(sys.exc_info()[1])
             else: # SPECIAL
                 try:
                     if get_ext(file_in_zip) == '.msg':
-                        memory_msg = cStringIO.StringIO()
+                        memory_msg = StringIO()
                         memory_msg.write(zf.open(file_in_zip).read())
                         msg = msmsg.MSMSG(memory_msg)
                         if msg.validMSG:
@@ -239,27 +251,27 @@ class AFile:
 
 
 ###################################################################################################################################
-#  __  __           _       _        _____                 _   _                 
-# |  \/  | ___   __| |_   _| | ___  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___ 
+#  __  __           _       _        _____                 _   _
+# |  \/  | ___   __| |_   _| | ___  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
 # | |\/| |/ _ \ / _` | | | | |/ _ \ | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
 # | |  | | (_) | (_| | |_| | |  __/ |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
 # |_|  |_|\___/ \__,_|\__,_|_|\___| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
 #
-###################################################################################################################################          
+###################################################################################################################################
 
 
 def find_all_files_in_directory(AFileClass, root_dir, excluded_directories, search_extensions, gauge_update_function=None):
     """Recursively searches a directory for files. search_extensions is a dictionary of extension lists"""
-    
+
     global TEXT_FILE_SIZE_LIMIT
 
     all_extensions = [ext for ext_list in search_extensions.values() for ext in ext_list]
 
     extension_types = {}
-    for ext_type, ext_list in search_extensions.iteritems():
+    for ext_type, ext_list in search_extensions.items():
         for ext in ext_list:
             extension_types[ext] = ext_type
-    
+
     if not gauge_update_function:
         pbar_widgets = ['Doc Hunt: ', progressbar.Percentage(), ' ', progressbar.Bar(marker = progressbar.RotatingMarker()), ' ', progressbar.ETA(), progressbar.FormatLabel(' Docs:0')]
         pbar = progressbar.ProgressBar(widgets = pbar_widgets).start()
@@ -354,12 +366,12 @@ def find_all_regexs_in_psts(pst_files, regexs, search_extensions, hunt_type, gau
 
 
 ###################################################################################################################################
-#  _   _ _   _ _ _ _           _____                 _   _                 
-# | | | | |_(_) (_) |_ _   _  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___ 
+#  _   _ _   _ _ _ _           _____                 _   _
+# | | | | |_(_) (_) |_ _   _  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
 # | | | | __| | | | __| | | | | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
 # | |_| | |_| | | | |_| |_| | |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
 #  \___/ \__|_|_|_|\__|\__, | |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
-#                      |___/                                               
+#                      |___/
 ###################################################################################################################################
 
 
@@ -423,7 +435,7 @@ def unicode2ascii(unicode_str):
 
 def decode_zip_filename(str):
 
-    if type(str) is unicode:
+    if type(str) is str:
         return str
     else:
         return str.decode('cp437')

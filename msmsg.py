@@ -4,9 +4,14 @@
 #
 # By BB
 # based on MS-OXMSG and MS-CFB Microsoft specification for MSG file format [MS-OXMSG].pdf v20140130
-#  
+#
 
-import struct, datetime, os, sys, unicodedata, codecs
+import struct
+import datetime
+import os
+import sys
+import unicodedata
+import codecs
 
 
 class MSGException(Exception):
@@ -16,12 +21,12 @@ error_log_list = []
 
 
 ###################################################################################################################################
-#  __  __ ____         ____ _____ ____  
-# |  \/  / ___|       / ___|  ___| __ ) 
-# | |\/| \___ \ _____| |   | |_  |  _ \ 
+#  __  __ ____         ____ _____ ____
+# |  \/  / ___|       / ___|  ___| __ )
+# | |\/| \___ \ _____| |   | |_  |  _ \
 # | |  | |___) |_____| |___|  _| | |_) |
-# |_|  |_|____/       \____|_|   |____/ 
-#                                       
+# |_|  |_|____/       \____|_|   |____/
+#
 ###################################################################################################################################
 
 
@@ -79,7 +84,7 @@ class MiniFAT:
             current_sector = mscfb.fat.entries[current_sector]
             minifat_entries = struct.unpack('I' * (mscfb.SectorSize/4), bytes)
             self.entries.extend(minifat_entries)
-    
+
 
     def get_all_mini_stream_fat_sectors(self):
 
@@ -114,9 +119,9 @@ class Directory:
         self.entries = self.get_all_directory_entries(self.mscfb.FirstDirectorySectorLocation)
         self.set_entry_children(self.entries[0]) # recursive
 
-        
+
     def get_all_directory_entries(self, start_sector):
-        
+
         entries = []
         sector = start_sector
         while sector != FAT.ENDOFCHAIN:
@@ -156,7 +161,7 @@ class Directory:
 
     def __repr__(self):
 
-        return u', '.join([entry.__repr__() for entry in self.entries]) 
+        return u', '.join([entry.__repr__() for entry in self.entries])
 
 
 
@@ -173,7 +178,7 @@ class DirectoryEntry:
 
         if len(bytes) != DirectoryEntry.ENTRY_SIZE:
             raise MSGException('Directory Entry not 128 bytes')
-        
+
         self.mscfb = mscfb
         self.NameLength = struct.unpack('H', bytes[64:66])[0]
         if self.NameLength > 64:
@@ -190,18 +195,20 @@ class DirectoryEntry:
             self.CreationTime = get_time(self.CreationTime)
         if self.ModifiedTime == '\x00'*8:
             self.ModifiedTime = None
-        else:   
+        else:
             self.ModifiedTime = get_time(self.ModifiedTime)
         self.StartingSectorLocation = struct.unpack('I', bytes[116:120])[0]
         self.StreamSize = struct.unpack('Q', bytes[120:128])[0]
         if mscfb.MajorVersion == 3:
             self.StreamSize = self.StreamSize & 0xFFFFFFFF # upper 32 bits may not be zero
         self.childs = {}
-    
-                    
+
+    def cmp(a, b):
+        return (a > b) - (a < b)
+
     def __cmp__(self, other):
-    
-        return cmp(self.Name, other.Name)
+
+        return self.cmp(self.Name, other.Name)
 
 
     def get_data(self):
@@ -212,7 +219,7 @@ class DirectoryEntry:
             self.stream_data = self.mscfb.minifat.get_stream(self.StartingSectorLocation, self.StreamSize)
         else: # FAT
             self.stream_data = self.mscfb.fat.get_stream(self.StartingSectorLocation, self.StreamSize)
-        return self.stream_data 
+        return self.stream_data
 
 
     def list_children(self, level=0, expand=False):
@@ -240,7 +247,7 @@ class MSCFB:
     def __init__(self, cfb_file):
         """cfb_file is unicode or string filename or a file object"""
 
-        if isinstance(cfb_file, str) or isinstance(cfb_file, unicode):
+        if isinstance(cfb_file, str) or isinstance(cfb_file, str):
             self.fd = open(cfb_file,'rb')
         else:
             self.fd = cfb_file
@@ -264,7 +271,7 @@ class MSCFB:
     def read_header(self, fd):
 
         self.validCFB = False
-        fd.seek(0)       
+        fd.seek(0)
         self.signature = fd.read(8)
         if self.signature != '\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1':
             return
@@ -300,12 +307,12 @@ class MSCFB:
 
 
 ###################################################################################################################################
-#  __  __ ____         _____  ____  __ ____   ____ 
+#  __  __ ____         _____  ____  __ ____   ____
 # |  \/  / ___|       / _ \ \/ /  \/  / ___| / ___|
-# | |\/| \___ \ _____| | | \  /| |\/| \___ \| |  _ 
+# | |\/| \___ \ _____| | | \  /| |\/| \___ \| |  _
 # | |  | |___) |_____| |_| /  \| |  | |___) | |_| |
 # |_|  |_|____/       \___/_/\_\_|  |_|____/ \____|
-#                                                                                      
+#
 ###################################################################################################################################
 
 
@@ -327,7 +334,7 @@ class PropertyStream:
                 reserved, self.NextRecipientID, self.NextAttachmentID, self.RecipientCount, self.AttachmentCount = struct.unpack('8sIIII', bytes[:24])
             if (len(bytes) - header_size) % 16 != 0:
                 raise MSGException('Property Stream size less header is not exactly divisible by 16')
-            property_entries_count = (len(bytes) - header_size) / 16        
+            property_entries_count = (len(bytes) - header_size) / 16
             for i in range(property_entries_count):
                 prop_entry = PropertyEntry(self.msmsg, parent_dir_entry, bytes[header_size + i*16: header_size + i*16 + 16])
                 if prop_entry in self.properties.keys():
@@ -379,7 +386,7 @@ class PropertyEntry:
                     index_stream_name = '%s-%X' % (stream_name, i)
                     value_bytes.append(parent_dir_entry.childs[index_stream_name].get_data())
                 self.value = ptype.value(value_bytes)
-            else: 
+            else:
                 self.value = ptype.value(bytes)
 
         else: # fixed size
@@ -435,12 +442,12 @@ class PType:
     def __init__(self, ptype, byte_count, is_variable, is_multi):
 
         self.ptype, self.byte_count, self.is_variable, self.is_multi = ptype, byte_count, is_variable, is_multi
-    
+
 
     def value(self, bytes):
         """bytes is normally a string of bytes, but if multi and variable, bytes is a list of bytes"""
 
-        if self.ptype ==  PTypeEnum.PtypInteger16:
+        if self.ptype == PTypeEnum.PtypInteger16:
             return struct.unpack('h', bytes)[0]
         elif self.ptype == PTypeEnum.PtypInteger32:
             return struct.unpack('i', bytes)[0]
@@ -498,7 +505,7 @@ class PType:
             count = len(bytes) / 8
             return [struct.unpack('q', bytes[i*8:(i+1)*8])[0] for i in range(count)]
         elif self.ptype == PTypeEnum.PtypMultipleString:
-            for item_bytes in bytes:          
+            for item_bytes in bytes:
                 s.append(item_bytes.decode('utf-16-le'))
             return s
         elif self.ptype == PTypeEnum.PtypMultipleString8:
@@ -669,7 +676,7 @@ class Attachment:
         if self.Filename:
             self.Filename = os.path.basename(self.Filename)
         else:
-            self.Filename = '[NoFilename_Method%s]' % self.AttachMethod        
+            self.Filename = '[NoFilename_Method%s]' % self.AttachMethod
         self.data = prop_stream.getval(PropIdEnum.PidTagAttachDataBinary)
         self.AttachMimeTag = prop_stream.getval(PropIdEnum.PidTagAttachMimeTag)
         self.AttachExtension = prop_stream.getval(PropIdEnum.PidTagAttachExtension)
@@ -751,38 +758,38 @@ class MSMSG:
 
     def set_property_types(self):
 
-        self.ptypes = {              
+        self.ptypes = {
             PTypeEnum.PtypInteger16:PType(PTypeEnum.PtypInteger16, 2, False, False),
-            PTypeEnum.PtypInteger32:PType(PTypeEnum.PtypInteger32, 4, False, False), 
-            PTypeEnum.PtypFloating32:PType(PTypeEnum.PtypFloating32, 4, False, False), 
-            PTypeEnum.PtypFloating64:PType(PTypeEnum.PtypFloating64, 8, False, False), 
-            PTypeEnum.PtypCurrency:PType(PTypeEnum.PtypCurrency, 8, False, False), 
-            PTypeEnum.PtypFloatingTime:PType(PTypeEnum.PtypFloatingTime, 8, False, False), 
-            PTypeEnum.PtypErrorCode:PType(PTypeEnum.PtypErrorCode, 4, False, False), 
-            PTypeEnum.PtypBoolean:PType(PTypeEnum.PtypBoolean, 1, False, False), 
-            PTypeEnum.PtypInteger64:PType(PTypeEnum.PtypInteger64, 8, False, False), 
-            PTypeEnum.PtypString:PType(PTypeEnum.PtypString, 0, True, False), 
-            PTypeEnum.PtypString8:PType(PTypeEnum.PtypString8, 0, True, False), 
-            PTypeEnum.PtypTime:PType(PTypeEnum.PtypTime, 8, False, False), 
+            PTypeEnum.PtypInteger32:PType(PTypeEnum.PtypInteger32, 4, False, False),
+            PTypeEnum.PtypFloating32:PType(PTypeEnum.PtypFloating32, 4, False, False),
+            PTypeEnum.PtypFloating64:PType(PTypeEnum.PtypFloating64, 8, False, False),
+            PTypeEnum.PtypCurrency:PType(PTypeEnum.PtypCurrency, 8, False, False),
+            PTypeEnum.PtypFloatingTime:PType(PTypeEnum.PtypFloatingTime, 8, False, False),
+            PTypeEnum.PtypErrorCode:PType(PTypeEnum.PtypErrorCode, 4, False, False),
+            PTypeEnum.PtypBoolean:PType(PTypeEnum.PtypBoolean, 1, False, False),
+            PTypeEnum.PtypInteger64:PType(PTypeEnum.PtypInteger64, 8, False, False),
+            PTypeEnum.PtypString:PType(PTypeEnum.PtypString, 0, True, False),
+            PTypeEnum.PtypString8:PType(PTypeEnum.PtypString8, 0, True, False),
+            PTypeEnum.PtypTime:PType(PTypeEnum.PtypTime, 8, False, False),
             PTypeEnum.PtypGuid:PType(PTypeEnum.PtypGuid, 16, False, False),
-            PTypeEnum.PtypServerId:PType(PTypeEnum.PtypServerId, 2, False, True), 
-            PTypeEnum.PtypRestriction:PType(PTypeEnum.PtypRestriction, 0, True, False), 
-            PTypeEnum.PtypRuleAction:PType(PTypeEnum.PtypRuleAction, 2, False, True), 
-            PTypeEnum.PtypBinary:PType(PTypeEnum.PtypBinary, 2, False, True), 
-            PTypeEnum.PtypMultipleInteger16:PType(PTypeEnum.PtypMultipleInteger16, 2, False, True), 
-            PTypeEnum.PtypMultipleInteger32:PType(PTypeEnum.PtypMultipleInteger32, 2, False, True), 
-            PTypeEnum.PtypMultipleFloating32:PType(PTypeEnum.PtypMultipleFloating32, 2, False, True), 
-            PTypeEnum.PtypMultipleFloating64:PType(PTypeEnum.PtypMultipleFloating64, 2, False, True), 
-            PTypeEnum.PtypMultipleCurrency:PType(PTypeEnum.PtypMultipleCurrency, 2, False, True), 
+            PTypeEnum.PtypServerId:PType(PTypeEnum.PtypServerId, 2, False, True),
+            PTypeEnum.PtypRestriction:PType(PTypeEnum.PtypRestriction, 0, True, False),
+            PTypeEnum.PtypRuleAction:PType(PTypeEnum.PtypRuleAction, 2, False, True),
+            PTypeEnum.PtypBinary:PType(PTypeEnum.PtypBinary, 2, False, True),
+            PTypeEnum.PtypMultipleInteger16:PType(PTypeEnum.PtypMultipleInteger16, 2, False, True),
+            PTypeEnum.PtypMultipleInteger32:PType(PTypeEnum.PtypMultipleInteger32, 2, False, True),
+            PTypeEnum.PtypMultipleFloating32:PType(PTypeEnum.PtypMultipleFloating32, 2, False, True),
+            PTypeEnum.PtypMultipleFloating64:PType(PTypeEnum.PtypMultipleFloating64, 2, False, True),
+            PTypeEnum.PtypMultipleCurrency:PType(PTypeEnum.PtypMultipleCurrency, 2, False, True),
             PTypeEnum.PtypMultipleFloatingTime:PType(PTypeEnum.PtypMultipleFloatingTime, 2, False, True),
-            PTypeEnum.PtypMultipleInteger64:PType(PTypeEnum.PtypMultipleInteger64, 2, False, True), 
-            PTypeEnum.PtypMultipleString:PType(PTypeEnum.PtypMultipleString, 2, True, True), 
-            PTypeEnum.PtypMultipleString8:PType(PTypeEnum.PtypMultipleString8, 2, True, True), 
-            PTypeEnum.PtypMultipleTime:PType(PTypeEnum.PtypMultipleTime, 2, False, True), 
-            PTypeEnum.PtypMultipleGuid:PType(PTypeEnum.PtypMultipleGuid, 2, False, True), 
-            PTypeEnum.PtypMultipleBinary:PType(PTypeEnum.PtypMultipleBinary, 2, False, True), 
-            PTypeEnum.PtypUnspecified:PType(PTypeEnum.PtypUnspecified, 0, False, False), 
-            PTypeEnum.PtypNull:PType(PTypeEnum.PtypNull, 0, False, False), 
+            PTypeEnum.PtypMultipleInteger64:PType(PTypeEnum.PtypMultipleInteger64, 2, False, True),
+            PTypeEnum.PtypMultipleString:PType(PTypeEnum.PtypMultipleString, 2, True, True),
+            PTypeEnum.PtypMultipleString8:PType(PTypeEnum.PtypMultipleString8, 2, True, True),
+            PTypeEnum.PtypMultipleTime:PType(PTypeEnum.PtypMultipleTime, 2, False, True),
+            PTypeEnum.PtypMultipleGuid:PType(PTypeEnum.PtypMultipleGuid, 2, False, True),
+            PTypeEnum.PtypMultipleBinary:PType(PTypeEnum.PtypMultipleBinary, 2, False, True),
+            PTypeEnum.PtypUnspecified:PType(PTypeEnum.PtypUnspecified, 0, False, False),
+            PTypeEnum.PtypNull:PType(PTypeEnum.PtypNull, 0, False, False),
             PTypeEnum.PtypObject:PType(PTypeEnum.PtypObject, 0, False, False)
         }
 
@@ -793,13 +800,13 @@ class MSMSG:
 
 
 ###################################################################################################################################
-#  __  __           _       _        _____                 _   _                 
-# |  \/  | ___   __| |_   _| | ___  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___ 
+#  __  __           _       _        _____                 _   _
+# |  \/  | ___   __| |_   _| | ___  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
 # | |\/| |/ _ \ / _` | | | | |/ _ \ | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
 # | |  | | (_) | (_| | |_| | |  __/ |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
 # |_|  |_|\___/ \__,_|\__,_|_|\___| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
 #
-###################################################################################################################################     
+###################################################################################################################################
 
 
 def hex(i):
@@ -858,8 +865,8 @@ def size_friendly(size):
 
 ###############################################################################################################################
 #
-#  _____         _     _____                 _   _                 
-# |_   _|__  ___| |_  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___ 
+#  _____         _     _____                 _   _
+# |_   _|__  ___| |_  |  ___|   _ _ __   ___| |_(_) ___  _ __  ___
 #   | |/ _ \/ __| __| | |_ | | | | '_ \ / __| __| |/ _ \| '_ \/ __|
 #   | |  __/\__ \ |_  |  _|| |_| | | | | (__| |_| | (_) | | | \__ \
 #   |_|\___||___/\__| |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|___/
@@ -870,7 +877,7 @@ def size_friendly(size):
 def test_status_msg(msg_file):
 
     msg = MSMSG(msg_file)
-    print msg.cfb.directory
+    print(msg.cfb.directory)
     msg.close()
 
 
@@ -890,10 +897,10 @@ def test_folder_msgs(test_folder):
             #s += u'\n' + msg.prop_stream.__repr__()
             s += u'Recipients: %s\n' % u', '.join([recip.__repr__() for recip in msg.recipients])
             s += u'Attachments: %s\n' % u', '.join([attach.__repr__() for attach in msg.attachments])
-            s += u'Subject: %s\nBody: %s\n' % (msg.Subject.__repr__(), msg.Body.__repr__())            
+            s += u'Subject: %s\nBody: %s\n' % (msg.Subject.__repr__(), msg.Body.__repr__())
             s += '\n\n\n'
             # dump attachments:
-            if False: 
+            if False:
                 for attachment in msg.attachments:
                     if len(attachment.data) !=0:
                         filepath = os.path.join(test_folder, attachment.Filename)
@@ -906,9 +913,9 @@ def test_folder_msgs(test_folder):
 
 
 ###################################################################################################################################
-#  __  __       _       
-# |  \/  | __ _(_)_ __  
-# | |\/| |/ _` | | '_ \ 
+#  __  __       _
+# |  \/  | __ _(_)_ __
+# | |\/| |/ _` | | '_ \
 # | |  | | (_| | | | | |
 # |_|  |_|\__,_|_|_| |_|
 #

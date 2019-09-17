@@ -8,17 +8,13 @@ By BB
 
 import os
 import sys
-# import zipfile
 import re
-# import datetime
 import argparse
 import time
 import hashlib
-# import unicodedata
 import platform
 import configparser
 import colorama
-# import progressbar
 import filehunt
 
 APP_VERSION = '1.3'
@@ -126,8 +122,8 @@ def load_config_file(prms):
     default_config = {}
     for nvp in config.items('DEFAULT'):
         default_config[nvp[0]] = nvp[1]
-    prms.update(default_config)
-    return prms
+    default_config.update(prms)
+    return default_config
 
 
 def hunt_pans(prms, gauge_update_function=None):

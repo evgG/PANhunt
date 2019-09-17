@@ -277,7 +277,7 @@ def find_all_files_in_dir(a_file_class, root_dir, excluded_directories,
         for filename in files:
             if root == root_dir:
                 root_items_completed += 1
-            afile = a_file_class(filename, root)  # a_file or PANFile
+            afile = a_file_class(filename, root)
             if afile.ext.lower() in all_extensions:
                 afile.set_file_stats()
                 afile.type = extension_types[afile.ext.lower()]
@@ -435,11 +435,18 @@ def get_ext(file_name):
     return os.path.splitext(file_name)[1].lower()
 
 
+# def get_friendly_size(size):
+#     if size < KB:
+#         return '{0}B'.format(size)
+#     if size < MB:
+#         return '{0}KB'.format(size / KB)
+#     if size < GB:
+#         return '{0}MB'.format(size / GB)
+#     return '{0:.1f}GB'.format(size * 1.0 / GB)
+
+
 def get_friendly_size(size):
-    if size < KB:
-        return '{0}B'.format(size)
-    if size < MB:
-        return '{0}KB'.format(size / KB)
-    if size < GB:
-        return '{0}MB'.format(size / GB)
-    return '{0:.1f}GB'.format(size * 1.0 / GB)
+    for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            return f'{size:3.1f} {x}'
+        size /= 1024.0

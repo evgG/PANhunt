@@ -57,7 +57,7 @@ class AFile:
         for brand, regex in regexs.items():
             pans = regex.findall(text)
             for pan in pans:
-                if is_valid_luhn_checksum(pan) and not is_excluded(pan, []):
+                if is_valid_luhn_checksum(pan) and not is_excluded(pan, []):  # TODO: change empty list
                     self.matches.append(PAN(self.path, sub_path, brand, pan))
 
     def size_friendly(self):

@@ -38,3 +38,5 @@ PANhunt.pyproj
 
 # rope
 .ropeproject/
+
+.pylintrc

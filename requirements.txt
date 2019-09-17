@@ -1,2 +1,2 @@
-Colorama
-Progressbar
+colorama
+progressbar

@@ -7,31 +7,25 @@ By BB
 """
 
 import os
-import sys
 import re
-import argparse
 import time
 import hashlib
 import platform
-import configparser
+
 import colorama
+
 import filehunt
 
+from config import load_config_file
+
 APP_VERSION = '1.3'
-PARAMS = {
-    'outfile': 'panhunt_%s.txt' % time.strftime("%Y-%m-%d-%H%M%S"),
-    'exclude': '/dev,/proc,/sys',
-    'textfiles': '.doc,.xls,.xml,.txt,.csv,.log',
-    'zipfiles': '.docx,.xlsx,.zip',
-    'specialfiles': '.msg',
-    'mailfiles': '.pst',
-    'otherfiles': '.ost,.accdb,.mdb',
-    'config_file': 'panhunt.ini'
-}
 PAN_REGEXS = {
-    'Mastercard': re.compile(r'(?:\D|^)(5[1-5][0-9]{2}(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4})(?:\D|$)'),
-    'Visa': re.compile(r'(?:\D|^)(4[0-9]{3}(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4})(?:\D|$)'),
-    'AMEX': re.compile(r'(?:\D|^)((?:34|37)[0-9]{2}(?:\ |\-|)[0-9]{6}(?:\ |\-|)[0-9]{5})(?:\D|$)')
+    'Mastercard': re.compile(r'(?:\D|^)(5[1-5][0-9]{2}(?:\ |\-|)[0-9]{4}'
+                             r'(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4})(?:\D|$)'),
+    'Visa': re.compile(r'(?:\D|^)(4[0-9]{3}(?:\ |\-|)[0-9]{4}'
+                       r'(?:\ |\-|)[0-9]{4}(?:\ |\-|)[0-9]{4})(?:\D|$)'),
+    'AMEX': re.compile(r'(?:\D|^)((?:34|37)[0-9]{2}(?:\ |\-|)[0-9]{6}'
+                       r'(?:\ |\-|)[0-9]{5})(?:\D|$)')
 }
 
 
@@ -83,10 +77,9 @@ def output_report(prms, all_f, total_searched, p_found):
     output_file = prms['outfile']
     pan_sep = '\n\t'
     pan_report = 'PAN Hunt Report - %s\n%s\n' % (time.strftime("%H:%M:%S %d/%m/%Y"), '=' * 100)
-    pan_report += 'Searched %s\nExcluded %s\n' % (params['search'], ','.join(prms['excluded_directories']))
-    pan_report += 'Command: %s\n' % (' '.join(sys.argv))
+    pan_report += 'Searched %s\nExcluded %s\n' % (params['search'], ','.join(prms['exclude']))
     pan_report += 'Uname: %s\n' % (' | '.join(platform.uname()))
-    pan_report += 'Searched %s files. Found %s possible PANs.\n%s\n\n' % (total_searched, p_found, '=' * 100)
+    pan_report += f'Searched {total_searched} files. Found {p_found} possible PANs.\n{"=" * 100}\n\n'
 
     for afile in sorted([afile for afile in all_f if afile.matches]):
         pan_header = 'FOUND PANs: %s (%s %s)' % (afile.path, afile.size_friendly(), afile.modified.strftime('%d/%m/%Y'))
@@ -101,19 +94,9 @@ def output_report(prms, all_f, total_searched, p_found):
     for afile in sorted([afile for afile in all_f if afile.type == 'OTHER']):
         pan_report += '%s (%s %s)\n' % (afile.path, afile.size_friendly(), afile.modified.strftime('%d/%m/%Y'))
 
-    pan_report = pan_report.replace('\n', os.linesep)
-
     print(colorama.Fore.WHITE + 'Report written to %s' % filehunt.unicode2ascii(output_file))
     filehunt.write_unicode_file(output_file, pan_report)
     add_hash_to_file(output_file)
-
-
-def load_config_file(config_file):
-    if not os.path.isfile(config_file):
-        return dict()
-    config = configparser.ConfigParser()
-    config.read(config_file)
-    return dict(config.defaults())
 
 
 def hunt_pans(prms, gauge_update_function=None):
@@ -145,71 +128,20 @@ def hunt_pans(prms, gauge_update_function=None):
 
 
 if __name__ == "__main__":
-    # TODO: Rewrite main
     colorama.init()
 
-    params = load_config_file(PARAMS.get('config_file', 'panhunt.ini'))
-    params.update(PARAMS)
-    arg_parser = argparse.ArgumentParser(
-        prog='panhunt',
-        description=f'PAN Hunt v{APP_VERSION}: search directories and sub directories for documents containing PANs.',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    arg_parser.add_argument('-s', dest='search',
-                            default=params['search'],
-                            help='base directory to search in')
-    arg_parser.add_argument('-x', dest='exclude',
-                            default=params['exclude'],
-                            help='directories to exclude from the search')
-    arg_parser.add_argument('-t', dest='textfiles',
-                            default=params['textfiles'],
-                            help='text file extensions to search')
-    arg_parser.add_argument('-z', dest='zipfiles',
-                            default=params['zipfiles'],
-                            help='zip file extensions to search')
-    arg_parser.add_argument('-e', dest='specialfiles',
-                            default=params['specialfiles'],
-                            help='special file extensions to search')
-    arg_parser.add_argument('-m', dest='mailfiles',
-                            default=params['mailfiles'],
-                            help='email file extensions to search')
-    arg_parser.add_argument('-l', dest='otherfiles',
-                            default=params['otherfiles'],
-                            help='other file extensions to list')
-    arg_parser.add_argument('-o', dest='outfile',
-                            default=params['outfile'],
-                            help='output file name for PAN report')
-    arg_parser.add_argument('-', dest='unmask', action='store_true',
-                            default=False, help='unmask PANs in output')
-    # arg_parser.add_argument('-C', dest='config',
-    #                         default=PARAMS['config_file'],
-    #                         help='configuration file to use')
-    arg_parser.add_argument('-X', dest='excludepans',
-                            default=params['excludepans'],
-                            help='PAN to exclude from search')
-    arg_parser.add_argument('-c', dest='checkfilehash', help=argparse.SUPPRESS)
-    args = arg_parser.parse_args()
-
-    if args.checkfilehash:
-        check_file_hash(args.checkfilehash)
-        sys.exit()
-    args = dict(args.__dict__)
-    params['mask_pans'] = not args.pop('unmask', None)
-    params.update(args)
-
+    params = load_config_file()
     search_ext = {
-        'TEXT': params.pop('textfiles').split(','),
-        'ZIP': params.pop('zipfiles').split(','),
-        'SPECIAL': params.pop('specialfiles').split(','),
-        'MAIL': params.pop('mailfiles').split(','),
-        'OTHER': params.pop('otherfiles').split(','),
+        'TEXT': params.pop('textfiles'),
+        'ZIP': params.pop('zipfiles'),
+        'SPECIAL': params.pop('specialfiles'),
+        'MAIL': params.pop('mailfiles'),
+        'OTHER': params.pop('otherfiles'),
     }
-
-    print(args)
-    print(params)
-    excluded_pans = params.get('excludepans', '').split(',')
-
     params['search_ext'] = search_ext
+
+    excluded_pans = params.get('excludepans', None) or ''
+
     total_files_searched, pans_found, all_files = hunt_pans(params)
 
     output_report(params, all_files, total_files_searched, pans_found)

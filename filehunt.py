@@ -15,10 +15,13 @@ import datetime
 from io import StringIO
 import unicodedata
 import codecs
+
 import colorama
 import progressbar
+
 import pst  # MS-PST files
 import msmsg  # MS-MSG files
+
 
 KB = 1024
 MB = 1024 * 1024

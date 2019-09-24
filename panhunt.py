@@ -29,25 +29,6 @@ PAN_REGEXS = {
 }
 
 
-class PAN:
-    """
-    PAN: A class for recording PANs, their brand and where they were found
-    """
-    def __init__(self, path, sub_path, brand, pan):
-        self.path = path
-        self.sub_path = sub_path
-        self.brand = brand
-        self.pan = pan
-
-    def __repr__(self, mask_pan=True):
-        if mask_pan:
-            return f'{self.sub_path} {self.brand}:{self.get_masked_pan()}'
-        return f'{self.sub_path} {self.brand}:{self.pan}'
-
-    def get_masked_pan(self):
-        return re.sub(r'\d', '*', self.pan[:-4]) + self.pan[-4:]
-
-
 def get_text_hash(text):
     if isinstance(text, str):
         return hashlib.sha512((text + 'PAN').encode('utf-8')).hexdigest()
@@ -55,7 +36,6 @@ def get_text_hash(text):
 
 
 def add_hash_to_file(text_file):
-    # text = filehunt.read_unicode_file(text_file)
     text = open(text_file, 'r', encoding='utf-8').read()
     text += os.linesep + get_text_hash(text)
     filehunt.write_unicode_file(text_file, text)
@@ -79,69 +59,41 @@ def output_report(prms, all_f, total_searched, p_found):
     pan_report = 'PAN Hunt Report - %s\n%s\n' % (time.strftime("%H:%M:%S %d/%m/%Y"), '=' * 100)
     pan_report += 'Searched %s\nExcluded %s\n' % (params['search'], ','.join(prms['exclude']))
     pan_report += 'Uname: %s\n' % (' | '.join(platform.uname()))
-    pan_report += f'Searched {total_searched} files. Found {p_found} possible PANs.\n{"=" * 100}\n\n'
+    pan_report += f'Total files: {all_f}. Searched {total_searched} files. '
+    pan_report += f'Found {p_found} possible PANs.\n{"=" * 100}\n\n'
 
-    for afile in sorted([afile for afile in all_f if afile.matches]):
-        pan_header = 'FOUND PANs: %s (%s %s)' % (afile.path, afile.size_friendly(), afile.modified.strftime('%d/%m/%Y'))
-        print(colorama.Fore.RED + filehunt.unicode2ascii(pan_header))
+    for pan in p_found:
+        pan_header = f'FOUND PANs: {pan["path"]} ({pan["filesize"]} {pan["modified"]}))'
+        print(colorama.Fore.RED + pan_header)
         pan_report += pan_header + '\n'
-        pan_list = '\t' + pan_sep.join([pan.__repr__(prms['mask_pans']) for pan in afile.matches])
-        print(colorama.Fore.YELLOW + filehunt.unicode2ascii(pan_list))
+        # pan_list = '\t' + pan_sep.join([pan.__repr__(prms['mask_pans']) for p in pan['pans']])
+        pan_list = '\t' + pan_sep.join(pan['pans'])
+        print(colorama.Fore.YELLOW + pan_list)
         pan_report += pan_list + '\n\n'
 
-    if [afile for afile in all_f if afile.type == 'OTHER']:
-        pan_report += 'Interesting Files to check separately:\n'
-    for afile in sorted([afile for afile in all_f if afile.type == 'OTHER']):
-        pan_report += '%s (%s %s)\n' % (afile.path, afile.size_friendly(), afile.modified.strftime('%d/%m/%Y'))
-
-    print(colorama.Fore.WHITE + 'Report written to %s' % filehunt.unicode2ascii(output_file))
+    print(colorama.Fore.WHITE + 'Report written to %s' % output_file)
     filehunt.write_unicode_file(output_file, pan_report)
     add_hash_to_file(output_file)
 
 
-def hunt_pans(prms, gauge_update_function=None):
+def hunt_pans(prms):
     search_dir = prms['search']
     excluded_directories = prms['exclude']
-    search_extensions = prms['search_ext']
-    all_f = filehunt.find_all_files_in_dir(filehunt.AFile, search_dir,
-                                           excluded_directories,
-                                           search_extensions,
-                                           gauge_update_function)
+    all_f = filehunt.find_files(search_dir, excluded_directories)
+    print(f'v2: {all_f}')
+    docs = [item for k, v in all_f.items()
+            if k.startswith('text/') for item in v]
+    print(f'docs_v2: {len(docs)}')
+    pan_list = filehunt.find_regexs_in_files(docs, PAN_REGEXS)
+    print(f'total_docs_v2: {pan_list}')
 
-    # check each file
-    docs = [afile for afile in all_f
-            if not afile.errors and afile.type in ('TEXT', 'ZIP', 'SPECIAL')]
-    total_docs, doc_pans_found = filehunt.find_all_regexs_in_files(docs,
-                                                                   PAN_REGEXS, search_extensions, 'PAN',
-                                                                   gauge_update_function)
-    # check each pst message and attachment
-    psts = [afile for afile in all_f
-            if not afile.errors and afile.type == 'MAIL']
-    total_psts, pst_pans_found = filehunt.find_all_regexs_in_psts(psts,
-                                                                  PAN_REGEXS, search_extensions, 'PAN',
-                                                                  gauge_update_function)
-
-    total_searched = total_docs + total_psts
-    p_found = doc_pans_found + pst_pans_found
-
-    return total_searched, p_found, all_f
+    return docs, pan_list, all_f
 
 
 if __name__ == "__main__":
-    colorama.init()
-
     params = load_config_file()
-    search_ext = {
-        'TEXT': params.pop('textfiles'),
-        'ZIP': params.pop('zipfiles'),
-        'SPECIAL': params.pop('specialfiles'),
-        'MAIL': params.pop('mailfiles'),
-        'OTHER': params.pop('otherfiles'),
-    }
-    params['search_ext'] = search_ext
-
     excluded_pans = params.get('excludepans', None) or ''
-
+    colorama.init()
     total_files_searched, pans_found, all_files = hunt_pans(params)
 
     output_report(params, all_files, total_files_searched, pans_found)

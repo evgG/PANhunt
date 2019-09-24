@@ -1,8 +1,6 @@
 {
   "search": ".",
   "exclude": ["/dev", "/proc", "/sys"],
-  "textfiles": [".doc", ".xls", ".xml", ".txt", ".csv", ".log"],
-  "zipfiles": [".docx", ".xlsx", ".zip"],
   "specialfiles": [".msg"],
   "mailfiles": [".pst"],
   "otherfiles": [".ost", ".accdb", ".mdb"],

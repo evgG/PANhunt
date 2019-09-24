@@ -55,18 +55,25 @@ def check_file_hash(text_file):
 
 def output_report(prms, all_f, total_searched, p_found):
     output_file = prms['outfile']
+    time_str = time.strftime("%H:%M:%S %d/%m/%Y")
+
     pan_sep = '\n\t'
-    pan_report = 'PAN Hunt Report - %s\n%s\n' % (time.strftime("%H:%M:%S %d/%m/%Y"), '=' * 100)
-    pan_report += 'Searched %s\nExcluded %s\n' % (params['search'], ','.join(prms['exclude']))
-    pan_report += 'Uname: %s\n' % (' | '.join(platform.uname()))
-    pan_report += f'Total files: {all_f}. Searched {total_searched} files. '
-    pan_report += f'Found {p_found} possible PANs.\n{"=" * 100}\n\n'
+    pan_report = f'PAN Hunt Report - {time_str}'
+    pan_report += f'\n{"=" * 100}\n'
+    pan_report += f'Searched {params["search"]}\n'
+    pan_report += f'Excluded {",".join(prms["exclude"])}\n'
+    pan_report += f'Uname: {" | ".join(platform.uname())}\n'
+    pan_report += (f'Total files: {len(all_f)}. ' +
+                   f'Searched {len(total_searched)} files. ')
+    pan_report += f'Found {len(p_found)} possible PANs.\n{"=" * 100}\n\n'
 
     for pan in p_found:
-        pan_header = f'FOUND PANs: {pan["path"]} ({pan["filesize"]} {pan["modified"]}))'
+        pan_header = (f'FOUND PANs: {pan["path"]} ' +
+                      f'({pan["filesize"]} {pan["modified"]}))')
         print(colorama.Fore.RED + pan_header)
         pan_report += pan_header + '\n'
-        # pan_list = '\t' + pan_sep.join([pan.__repr__(prms['mask_pans']) for p in pan['pans']])
+        # pan_list = '\t' + pan_sep.join([pan.__repr__(prms['mask_pans'])
+        # for p in pan['pans']])
         pan_list = '\t' + pan_sep.join(pan['pans'])
         print(colorama.Fore.YELLOW + pan_list)
         pan_report += pan_list + '\n\n'
@@ -80,12 +87,9 @@ def hunt_pans(prms):
     search_dir = prms['search']
     excluded_directories = prms['exclude']
     all_f = filehunt.find_files(search_dir, excluded_directories)
-    print(f'v2: {all_f}')
     docs = [item for k, v in all_f.items()
             if k.startswith('text/') for item in v]
-    print(f'docs_v2: {len(docs)}')
     pan_list = filehunt.find_regexs_in_files(docs, PAN_REGEXS)
-    print(f'total_docs_v2: {pan_list}')
 
     return docs, pan_list, all_f
 
@@ -95,5 +99,4 @@ if __name__ == "__main__":
     excluded_pans = params.get('excludepans', None) or ''
     colorama.init()
     total_files_searched, pans_found, all_files = hunt_pans(params)
-
     output_report(params, all_files, total_files_searched, pans_found)
